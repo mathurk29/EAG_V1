@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Site Blocker</title>
+  <style>
+    body {
+      width: 300px;
+      padding: 15px;
+      font-family: Arial, sans-serif;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    input[type="text"] {
+      width: 100%;
+      padding: 8px;
+      margin: 5px 0;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+    }
+    button {
+      padding: 8px 15px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+    }
+    button:hover {
+      background-color: #45a049;
+    }
+    #blockedSites {
+      margin-top: 10px;
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .site-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px;
+      border-bottom: 1px solid #eee;
+    }
+    .remove-btn {
+      background-color: #ff4444;
+    }
+    .remove-btn:hover {
+      background-color: #cc0000;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h2>Site Blocker</h2>
+    <div>
+      <input type="text" id="siteInput" placeholder="Enter website URL (e.g., facebook.com)">
+      <button id="addSite">Add Site</button>
+    </div>
+    <div id="blockedSites"></div>
+  </div>
+  <script src="popup.js"></script>
+</body>
+</html> 
