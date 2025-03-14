@@ -4,7 +4,7 @@
   <title>Site Blocker</title>
   <style>
     body {
-      width: 300px;
+      width: 350px;
       padding: 15px;
       font-family: Arial, sans-serif;
     }
@@ -31,8 +31,60 @@
     button:hover {
       background-color: #45a049;
     }
+    .collections-container {
+      margin: 15px 0;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      padding: 15px;
+    }
+    .collection-title {
+      font-weight: bold;
+      margin-bottom: 15px;
+      color: #333;
+    }
+    .collections-grid {
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .collection-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .collection-checkbox {
+      position: relative;
+      width: 18px;
+      height: 18px;
+      cursor: pointer;
+    }
+    .collection-label {
+      flex: 1;
+      cursor: pointer;
+      user-select: none;
+    }
+    .collection-count {
+      background-color: #e0e0e0;
+      padding: 2px 6px;
+      border-radius: 10px;
+      font-size: 12px;
+      color: #666;
+    }
+    .collection-sites {
+      display: none;
+      margin-left: 28px;
+      font-size: 12px;
+      color: #666;
+      margin-top: 5px;
+    }
+    .collection-item:hover .collection-sites {
+      display: block;
+    }
+    .divider {
+      border-top: 1px solid #eee;
+      margin: 15px 0;
+    }
     #blockedSites {
-      margin-top: 10px;
       max-height: 200px;
       overflow-y: auto;
     }
@@ -49,17 +101,35 @@
     .remove-btn:hover {
       background-color: #cc0000;
     }
+    .current-site-btn {
+      background-color: #2196F3;
+      width: 100%;
+    }
+    .current-site-btn:hover {
+      background-color: #1976D2;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>Site Blocker</h2>
+    
+    <button id="blockCurrentSite" class="current-site-btn">Block Current Site</button>
+    
+    <div class="collections-container">
+      <div class="collection-title">Website Collections</div>
+      <div class="collections-grid" id="collectionsGrid"></div>
+    </div>
+
+    <div class="divider"></div>
+    
     <div>
       <input type="text" id="siteInput" placeholder="Enter website URL (e.g., facebook.com)">
       <button id="addSite">Add Site</button>
     </div>
     <div id="blockedSites"></div>
   </div>
+  <script src="site-collections.js"></script>
   <script src="popup.js"></script>
 </body>
 </html> 

@@ -6,7 +6,8 @@
   "permissions": [
     "storage",
     "webNavigation",
-    "tabs"
+    "tabs",
+    "activeTab"
   ],
   "host_permissions": [
     "<all_urls>"
@@ -31,7 +32,7 @@
     "extension_pages": "script-src 'self'; object-src 'self'"
   },
   "web_accessible_resources": [{
-    "resources": ["karmanye.png", "blocked.html"],
+    "resources": ["karmanye.png", "blocked.html", "site-collections.js"],
     "matches": ["<all_urls>"]
   }]
 } 
