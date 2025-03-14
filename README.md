@@ -25,12 +25,6 @@ A simple Chrome extension that helps you block distracting websites to improve p
 4. The extension will automatically block access to the specified websites
 5. To remove a blocked site, click the "Remove" button next to it in the popup
 
-## Note
-
-You'll need to create an `icons` folder and add icon files (16x16, 48x48, and 128x128 pixels) named:
-- icon16.png
-- icon48.png
-- icon128.png
 
 ## Privacy
 
