@@ -10,6 +10,28 @@ function isBlocked(url) {
   });
 }
 
+// Function to get cached Gemini response
+function getCachedGeminiResponse(site) {
+  return new Promise((resolve) => {
+    chrome.storage.sync.get(['geminiResponses'], function(result) {
+      const responses = result.geminiResponses || {};
+      resolve(responses[site]);
+    });
+  });
+}
+
+// Function to cache Gemini response
+function cacheGeminiResponse(site, isDistracting) {
+  chrome.storage.sync.get(['geminiResponses'], function(result) {
+    const responses = result.geminiResponses || {};
+    responses[site] = {
+      isDistracting,
+      timestamp: Date.now()
+    };
+    chrome.storage.sync.set({ geminiResponses: responses });
+  });
+}
+
 // Function to check if a URL is a Chrome internal page
 function isChromeInternalPage(url) {
   const chromeInternalProtocols = [
@@ -50,6 +72,13 @@ function addLogEntry(site, response, isBlocked) {
 // Function to check with Gemini if a site is distracting
 async function checkWithGemini(site) {
   try {
+    // First check if we have a cached response
+    const cachedResponse = await getCachedGeminiResponse(site);
+    if (cachedResponse) {
+      addLogEntry(site, cachedResponse.isDistracting ? 'Yes (cached)' : 'No (cached)', cachedResponse.isDistracting);
+      return cachedResponse.isDistracting;
+    }
+
     const result = await chrome.storage.sync.get(['apiKey']);
     if (!result.apiKey) {
       addLogEntry(site, 'No API key configured', false);
@@ -78,8 +107,13 @@ async function checkWithGemini(site) {
 
     const data = await response.json();
     const answer = data.candidates[0].content.parts[0].text.toLowerCase().trim();
-    addLogEntry(site, answer, answer === 'yes');
-    return answer === 'yes';
+    const isDistracting = answer === 'yes';
+    
+    // Cache the response
+    cacheGeminiResponse(site, isDistracting);
+    
+    addLogEntry(site, answer, isDistracting);
+    return isDistracting;
   } catch (error) {
     console.error('Error checking site with Gemini:', error);
     addLogEntry(site, `Error: ${error.message}`, false);
