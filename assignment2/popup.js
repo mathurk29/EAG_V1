@@ -152,7 +152,7 @@ document.addEventListener('DOMContentLoaded', function() {
         body: JSON.stringify({
           contents: [{
             parts: [{
-              text: `Is ${site} a distracting website that should be blocked to maintain focus? Answer with only 'yes' or 'no'.`
+              text: `Is ${site} a distracting website that should be blocked to maintain focus? Evaluate basis of following categories: Entertainment, Social Media, News, Shopping, Gambling, Gaming, Sports. Answer with only 'yes' or 'no'.`
             }]
           }]
         })
