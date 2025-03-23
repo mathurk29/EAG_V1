@@ -10,10 +10,60 @@ function isBlocked(url) {
   });
 }
 
+// Function to check with Gemini if a site is distracting
+async function checkWithGemini(site) {
+  try {
+    const result = await chrome.storage.sync.get(['apiKey']);
+    if (!result.apiKey) {
+      return false;
+    }
+
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${result.apiKey}`
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: `Is ${site} a distracting website that should be blocked to maintain focus? Answer with only 'yes' or 'no'.`
+          }]
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('API request failed');
+    }
+
+    const data = await response.json();
+    const answer = data.candidates[0].content.parts[0].text.toLowerCase().trim();
+    return answer === 'yes';
+  } catch (error) {
+    console.error('Error checking site with Gemini:', error);
+    return false;
+  }
+}
+
+// Function to check if a URL should be blocked
+async function shouldBlock(url) {
+  const hostname = new URL(url).hostname.toLowerCase();
+  
+  // First check if it's in the blocked list
+  const isInBlockedList = await isBlocked(url);
+  if (isInBlockedList) {
+    return true;
+  }
+
+  // If not in blocked list, check with Gemini
+  return await checkWithGemini(hostname);
+}
+
 // Listen for navigation events
 chrome.webNavigation.onBeforeNavigate.addListener(async function(details) {
   if (details.frameId === 0) { // Only block main frame navigation
-    const blocked = await isBlocked(details.url);
+    const blocked = await shouldBlock(details.url);
     if (blocked) {
       chrome.tabs.update(details.tabId, {
         url: chrome.runtime.getURL('blocked.html')
@@ -25,11 +75,11 @@ chrome.webNavigation.onBeforeNavigate.addListener(async function(details) {
 // Listen for tab updates
 chrome.tabs.onUpdated.addListener(async function(tabId, changeInfo, tab) {
   if (changeInfo.status === 'loading' && tab.url) {
-    const blocked = await isBlocked(tab.url);
+    const blocked = await shouldBlock(tab.url);
     if (blocked) {
       chrome.tabs.update(tabId, {
         url: chrome.runtime.getURL('blocked.html')
       });
     }
   }
-}); 
+});

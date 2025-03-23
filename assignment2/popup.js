@@ -3,11 +3,98 @@ document.addEventListener('DOMContentLoaded', function() {
   const addButton = document.getElementById('addSite');
   const blockCurrentButton = document.getElementById('blockCurrentSite');
   const blockedSitesDiv = document.getElementById('blockedSites');
-  const collectionsGrid = document.getElementById('collectionsGrid');
+  const apiKeyInput = document.getElementById('apiKeyInput');
+  const saveApiKeyButton = document.getElementById('saveApiKey');
+  const apiKeyDisplay = document.getElementById('apiKeyDisplay');
+  const editApiKeyButton = document.getElementById('editApiKey');
+  const testApiKeyButton = document.getElementById('testApiKey');
+  const apiStatus = document.getElementById('apiStatus');
 
-  // Load blocked sites and collections when popup opens
+  // Load blocked sites and API key when popup opens
   loadBlockedSites();
-  loadCollections();
+  loadApiKey();
+
+  // API Key Management
+  saveApiKeyButton.addEventListener('click', function() {
+    const apiKey = apiKeyInput.value.trim();
+    if (apiKey) {
+      chrome.storage.sync.set({ apiKey: apiKey }, function() {
+        showFeedback('API Key saved successfully');
+        loadApiKey();
+      });
+    }
+  });
+
+  editApiKeyButton.addEventListener('click', function() {
+    apiKeyDisplay.style.display = 'none';
+    document.getElementById('apiKeySection').style.display = 'block';
+  });
+
+  testApiKeyButton.addEventListener('click', async function() {
+    const result = await chrome.storage.sync.get(['apiKey']);
+    const apiKey = result.apiKey;
+    
+    if (!apiKey) {
+      showApiStatus('Please save an API key first', 'error');
+      return;
+    }
+
+    try {
+      const response = await testGeminiConnection(apiKey);
+      if (response.success) {
+        showApiStatus('Connected to Gemini API successfully', 'connected');
+      } else {
+        showApiStatus('Failed to connect to Gemini API', 'error');
+      }
+    } catch (error) {
+      showApiStatus('Error testing connection: ' + error.message, 'error');
+    }
+  });
+
+  // Load API Key
+  function loadApiKey() {
+    chrome.storage.sync.get(['apiKey'], function(result) {
+      if (result.apiKey) {
+        apiKeyDisplay.style.display = 'block';
+        document.getElementById('apiKeySection').style.display = 'none';
+      } else {
+        apiKeyDisplay.style.display = 'none';
+        document.getElementById('apiKeySection').style.display = 'block';
+      }
+    });
+  }
+
+  // Test Gemini Connection
+  async function testGeminiConnection(apiKey) {
+    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        contents: [{
+          parts: [{
+            text: "Test connection"
+          }]
+        }]
+      })
+    });
+
+    if (!response.ok) {
+      throw new Error('API request failed');
+    }
+
+    const data = await response.json();
+    return { success: true, data };
+  }
+
+  // Show API Status
+  function showApiStatus(message, type) {
+    apiStatus.textContent = message;
+    apiStatus.className = `api-status ${type}`;
+    apiStatus.style.display = 'block';
+  }
 
   // Add new site to block
   addButton.addEventListener('click', function() {
@@ -15,20 +102,62 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   // Block current site button
-  blockCurrentButton.addEventListener('click', function() {
-    chrome.tabs.query({ active: true, currentWindow: true }, function(tabs) {
+  blockCurrentButton.addEventListener('click', async function() {
+    const result = await chrome.storage.sync.get(['apiKey']);
+    if (!result.apiKey) {
+      showFeedback('Please save an API key first');
+      return;
+    }
+
+    chrome.tabs.query({ active: true, currentWindow: true }, async function(tabs) {
       if (tabs[0]) {
         const url = new URL(tabs[0].url);
         // Don't block chrome:// URLs or the blocked.html page
         if (url.protocol.startsWith('http')) {
           const hostname = url.hostname.replace(/^www\./, '');
-          addSite(hostname);
+          const isDistracting = await checkIfDistracting(hostname, result.apiKey);
+          if (isDistracting) {
+            addSite(hostname);
+          } else {
+            showFeedback('Site is not distracting');
+          }
         } else {
-          alert('Cannot block this type of page');
+          showFeedback('Cannot block this type of page');
         }
       }
     });
   });
+
+  // Check if site is distracting using Gemini
+  async function checkIfDistracting(site, apiKey) {
+    try {
+      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Is ${site} a distracting website that should be blocked to maintain focus? Answer with only 'yes' or 'no'.`
+            }]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('API request failed');
+      }
+
+      const data = await response.json();
+      const answer = data.candidates[0].content.parts[0].text.toLowerCase().trim();
+      return answer === 'yes';
+    } catch (error) {
+      console.error('Error checking site:', error);
+      return false;
+    }
+  }
 
   // Also trigger add when Enter key is pressed
   siteInput.addEventListener('keypress', function(e) {
@@ -51,14 +180,12 @@ document.addEventListener('DOMContentLoaded', function() {
         if (!blockedSites.includes(site)) {
           blockedSites.push(site);
           chrome.storage.sync.set({ blockedSites: blockedSites }, function() {
-            console.log('Site added:', site); // Debug log
+            console.log('Site added:', site);
             loadBlockedSites();
             if (!predefinedSite) {
               siteInput.value = '';
             }
-            // Show feedback to user
             showFeedback(`Added ${site} to blocked list`);
-            updateCollectionStates(blockedSites);
           });
         } else {
           showFeedback(`${site} is already blocked`);
@@ -93,7 +220,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function loadBlockedSites() {
     chrome.storage.sync.get(['blockedSites'], function(result) {
       const blockedSites = result.blockedSites || [];
-      console.log('Current blocked sites:', blockedSites); // Debug log
+      console.log('Current blocked sites:', blockedSites);
       blockedSitesDiv.innerHTML = '';
       
       blockedSites.forEach(site => {
@@ -123,111 +250,10 @@ document.addEventListener('DOMContentLoaded', function() {
       const blockedSites = result.blockedSites || [];
       const updatedSites = blockedSites.filter(site => site !== siteToRemove);
       chrome.storage.sync.set({ blockedSites: updatedSites }, function() {
-        console.log('Site removed:', siteToRemove); // Debug log
+        console.log('Site removed:', siteToRemove);
         loadBlockedSites();
         showFeedback(`Removed ${siteToRemove} from blocked list`);
-        updateCollectionStates(updatedSites);
       });
     });
   }
-
-  // Function to load collections
-  async function loadCollections() {
-    const result = await chrome.storage.sync.get(['blockedSites', 'activeCollections']);
-    const blockedSites = result.blockedSites || [];
-    const activeCollections = result.activeCollections || {};
-
-    collectionsGrid.innerHTML = '';
-
-    Object.entries(siteCollections).forEach(([key, collection]) => {
-      const collectionItem = document.createElement('div');
-      collectionItem.className = 'collection-item';
-
-      // Create checkbox
-      const checkbox = document.createElement('input');
-      checkbox.type = 'checkbox';
-      checkbox.className = 'collection-checkbox';
-      checkbox.id = `collection-${key}`;
-      checkbox.checked = activeCollections[key] || false;
-
-      // Create label
-      const label = document.createElement('label');
-      label.className = 'collection-label';
-      label.htmlFor = `collection-${key}`;
-      label.textContent = collection.name;
-
-      // Create count badge
-      const count = document.createElement('span');
-      count.className = 'collection-count';
-      count.textContent = collection.sites.length;
-
-      // Create sites preview
-      const sites = document.createElement('div');
-      sites.className = 'collection-sites';
-      sites.textContent = collection.sites.slice(0, 3).join(', ') + 
-        (collection.sites.length > 3 ? ' ...' : '');
-
-      // Add event listener to checkbox
-      checkbox.addEventListener('change', () => toggleCollection(key, collection, checkbox.checked));
-
-      collectionItem.appendChild(checkbox);
-      collectionItem.appendChild(label);
-      collectionItem.appendChild(count);
-      collectionItem.appendChild(sites);
-      collectionsGrid.appendChild(collectionItem);
-    });
-  }
-
-  // Function to toggle collection
-  async function toggleCollection(key, collection, isEnabled) {
-    try {
-      const result = await chrome.storage.sync.get(['blockedSites', 'activeCollections']);
-      let blockedSites = result.blockedSites || [];
-      let activeCollections = result.activeCollections || {};
-
-      if (isEnabled) {
-        // Add sites from collection
-        collection.sites.forEach(site => {
-          if (!blockedSites.includes(site)) {
-            blockedSites.push(site);
-          }
-        });
-        activeCollections[key] = true;
-        showFeedback(`Enabled ${collection.name} collection`);
-      } else {
-        // Remove sites from collection
-        blockedSites = blockedSites.filter(site => 
-          !collection.sites.includes(site)
-        );
-        activeCollections[key] = false;
-        showFeedback(`Disabled ${collection.name} collection`);
-      }
-
-      await chrome.storage.sync.set({ 
-        blockedSites,
-        activeCollections
-      });
-      loadBlockedSites();
-    } catch (error) {
-      console.error('Error toggling collection:', error);
-      showFeedback('Error updating sites');
-    }
-  }
-
-  // When manually adding or removing sites, we should check if they belong to any collection
-  async function updateCollectionStates(sites) {
-    const result = await chrome.storage.sync.get(['activeCollections']);
-    let activeCollections = result.activeCollections || {};
-
-    Object.entries(siteCollections).forEach(([key, collection]) => {
-      // Check if all sites in the collection are blocked
-      const allSitesBlocked = collection.sites.every(site => 
-        sites.includes(site)
-      );
-      activeCollections[key] = allSitesBlocked;
-    });
-
-    await chrome.storage.sync.set({ activeCollections });
-    loadCollections();
-  }
-}); 
+});
