@@ -10,6 +10,19 @@ function isBlocked(url) {
   });
 }
 
+// Function to check if a URL is a Chrome internal page
+function isChromeInternalPage(url) {
+  const chromeInternalProtocols = [
+    'chrome://',
+    'chrome-extension://',
+    'about:',
+    'chrome-search://',
+    'devtools://'
+  ];
+  
+  return chromeInternalProtocols.some(protocol => url.startsWith(protocol));
+}
+
 // Function to check with Gemini if a site is distracting
 async function checkWithGemini(site) {
   try {
@@ -18,11 +31,10 @@ async function checkWithGemini(site) {
       return false;
     }
 
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+    const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${result.apiKey}`, {
       method: 'POST',
       headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${result.apiKey}`
+        'Content-Type': 'application/json'
       },
       body: JSON.stringify({
         contents: [{
@@ -48,6 +60,11 @@ async function checkWithGemini(site) {
 
 // Function to check if a URL should be blocked
 async function shouldBlock(url) {
+  // Don't block Chrome internal pages
+  if (isChromeInternalPage(url)) {
+    return false;
+  }
+
   const hostname = new URL(url).hostname.toLowerCase();
   
   // First check if it's in the blocked list

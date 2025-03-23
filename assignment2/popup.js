@@ -40,6 +40,7 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     try {
+      console.log('Testing API connection with key:', apiKey.substring(0, 5) + '...');
       const response = await testGeminiConnection(apiKey);
       if (response.success) {
         showApiStatus('Connected to Gemini API successfully', 'connected');
@@ -47,6 +48,7 @@ document.addEventListener('DOMContentLoaded', function() {
         showApiStatus('Failed to connect to Gemini API', 'error');
       }
     } catch (error) {
+      console.error('Detailed error:', error);
       showApiStatus('Error testing connection: ' + error.message, 'error');
     }
   });
@@ -66,27 +68,38 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Test Gemini Connection
   async function testGeminiConnection(apiKey) {
-    const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        contents: [{
-          parts: [{
-            text: "Test connection"
+    try {
+      console.log('Making API request to Gemini Flash 2.0...');
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: "Test connection"
+            }]
           }]
-        }]
-      })
-    });
+        })
+      });
 
-    if (!response.ok) {
-      throw new Error('API request failed');
+      console.log('API Response status:', response.status);
+      console.log('API Response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('API Error response:', errorText);
+        throw new Error(`API request failed with status ${response.status}: ${errorText}`);
+      }
+
+      const data = await response.json();
+      console.log('API Response data:', data);
+      return { success: true, data };
+    } catch (error) {
+      console.error('API request error:', error);
+      throw error;
     }
-
-    const data = await response.json();
-    return { success: true, data };
   }
 
   // Show API Status
@@ -131,11 +144,10 @@ document.addEventListener('DOMContentLoaded', function() {
   // Check if site is distracting using Gemini
   async function checkIfDistracting(site, apiKey) {
     try {
-      const response = await fetch('https://generativelanguage.googleapis.com/v1beta/models/gemini-pro:generateContent', {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${apiKey}`
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
           contents: [{
