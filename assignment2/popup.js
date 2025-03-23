@@ -18,7 +18,7 @@ document.addEventListener('DOMContentLoaded', function() {
   loadLogs();
 
   // Function to add a log entry
-  function addLogEntry(site, response, isBlocked) {
+  function addLogEntry(site, response, isBlocked, source = 'Manual Check') {
     const logEntry = document.createElement('div');
     logEntry.className = 'log-entry';
     
@@ -28,11 +28,11 @@ document.addEventListener('DOMContentLoaded', function() {
     
     const responseSpan = document.createElement('div');
     responseSpan.className = 'log-response';
-    responseSpan.textContent = `Gemini Response: ${response}`;
+    responseSpan.textContent = `Response: ${response}`;
     
     const actionSpan = document.createElement('div');
     actionSpan.className = 'log-response';
-    actionSpan.textContent = `Action: ${isBlocked ? 'Blocked' : 'Allowed'}`;
+    actionSpan.textContent = `Action: ${isBlocked ? 'Blocked' : 'Allowed'} (${source})`;
     
     logEntry.appendChild(siteSpan);
     logEntry.appendChild(responseSpan);
@@ -54,8 +54,9 @@ document.addEventListener('DOMContentLoaded', function() {
   function saveLogs() {
     const logs = Array.from(logContainer.children).map(entry => ({
       site: entry.querySelector('.log-site').textContent.replace('Site: ', ''),
-      response: entry.querySelector('.log-response').textContent.replace('Gemini Response: ', ''),
-      action: entry.querySelector('.log-response:last-child').textContent.replace('Action: ', '')
+      response: entry.querySelector('.log-response').textContent.replace('Response: ', ''),
+      action: entry.querySelector('.log-response:last-child').textContent.split(' (')[0].replace('Action: ', ''),
+      source: entry.querySelector('.log-response:last-child').textContent.match(/\((.*)\)$/)[1]
     }));
     chrome.storage.sync.set({ siteCheckLogs: logs });
   }
@@ -65,7 +66,7 @@ document.addEventListener('DOMContentLoaded', function() {
     chrome.storage.sync.get(['siteCheckLogs'], function(result) {
       const logs = result.siteCheckLogs || [];
       logs.forEach(log => {
-        addLogEntry(log.site, log.response, log.action === 'Blocked');
+        addLogEntry(log.site, log.response, log.action === 'Blocked', log.source);
       });
     });
   }
@@ -99,14 +100,14 @@ document.addEventListener('DOMContentLoaded', function() {
       const response = await testGeminiConnection(apiKey);
       if (response.success) {
         showApiStatus('Connected to Gemini API successfully', 'connected');
-        addLogEntry('Test Connection', 'Success', false);
+        addLogEntry('Test Connection', 'Success', false, 'API Test');
       } else {
         showApiStatus('Failed to connect to Gemini API', 'error');
-        addLogEntry('Test Connection', 'Failed', false);
+        addLogEntry('Test Connection', 'Failed', false, 'API Test');
       }
     } catch (error) {
       showApiStatus('Error testing connection: ' + error.message, 'error');
-      addLogEntry('Test Connection', 'Error: ' + error.message, false);
+      addLogEntry('Test Connection', 'Error: ' + error.message, false, 'API Test');
     }
   });
 
@@ -180,10 +181,10 @@ document.addEventListener('DOMContentLoaded', function() {
         if (url.protocol.startsWith('http')) {
           const hostname = url.hostname.replace(/^www\./, '');
           addSite(hostname);
-          addLogEntry(hostname, 'Manually blocked by user', true);
+          addLogEntry(hostname, 'Manually blocked by user', true, 'Manual Block');
         } else {
           showFeedback('Cannot block this type of page');
-          addLogEntry(url.href, 'Not checked (Chrome internal page)', false);
+          addLogEntry(url.href, 'Not checked (Chrome internal page)', false, 'System');
         }
       }
     });

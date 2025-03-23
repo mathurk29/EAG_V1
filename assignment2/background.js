@@ -30,7 +30,8 @@ function addLogEntry(site, response, isBlocked) {
     const newLog = {
       site: site,
       response: response,
-      action: isBlocked ? 'Blocked' : 'Allowed'
+      action: isBlocked ? 'Blocked' : 'Allowed',
+      source: 'Background Check'
     };
     
     // Add to beginning of array
