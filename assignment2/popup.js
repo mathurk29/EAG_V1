@@ -173,26 +173,14 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Block current site button
   blockCurrentButton.addEventListener('click', async function() {
-    const result = await chrome.storage.sync.get(['apiKey']);
-    if (!result.apiKey) {
-      showFeedback('Please save an API key first');
-      return;
-    }
-
     chrome.tabs.query({ active: true, currentWindow: true }, async function(tabs) {
       if (tabs[0]) {
         const url = new URL(tabs[0].url);
         // Don't block chrome:// URLs or the blocked.html page
         if (url.protocol.startsWith('http')) {
           const hostname = url.hostname.replace(/^www\./, '');
-          const isDistracting = await checkIfDistracting(hostname, result.apiKey);
-          if (isDistracting) {
-            addSite(hostname);
-            addLogEntry(hostname, 'Yes', true);
-          } else {
-            showFeedback('Site is not distracting');
-            addLogEntry(hostname, 'No', false);
-          }
+          addSite(hostname);
+          addLogEntry(hostname, 'Manually blocked by user', true);
         } else {
           showFeedback('Cannot block this type of page');
           addLogEntry(url.href, 'Not checked (Chrome internal page)', false);
@@ -297,36 +285,6 @@ document.addEventListener('DOMContentLoaded', function() {
         showFeedback(`Removed ${siteToRemove} from blocked list`);
       });
     });
-  }
-
-  // Check if site is distracting using Gemini
-  async function checkIfDistracting(site, apiKey) {
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Is ${site} a distracting website that should be blocked to maintain focus? Evaluate basis of following categories: Entertainment, Social Media, News, Shopping, Gambling, Gaming, Sports. Answer with only 'yes' or 'no'.`
-            }]
-          }]
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('API request failed');
-      }
-
-      const data = await response.json();
-      const answer = data.candidates[0].content.parts[0].text.toLowerCase().trim();
-      return answer === 'yes';
-    } catch (error) {
-      console.error('Error checking site:', error);
-      return false;
-    }
   }
 
   // Clear logs button functionality

@@ -130,3 +130,18 @@ chrome.tabs.onUpdated.addListener(async function(tabId, changeInfo, tab) {
     }
   }
 });
+
+// Listen for messages from popup
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
+  if (request.action === 'checkIfDistracting') {
+    checkWithGemini(request.site)
+      .then(isDistracting => {
+        sendResponse({ isDistracting });
+      })
+      .catch(error => {
+        console.error('Error checking site:', error);
+        sendResponse({ isDistracting: false, error: error.message });
+      });
+    return true; // Will respond asynchronously
+  }
+});
