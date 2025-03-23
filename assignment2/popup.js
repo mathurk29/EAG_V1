@@ -9,10 +9,66 @@ document.addEventListener('DOMContentLoaded', function() {
   const editApiKeyButton = document.getElementById('editApiKey');
   const testApiKeyButton = document.getElementById('testApiKey');
   const apiStatus = document.getElementById('apiStatus');
+  const logContainer = document.getElementById('logContainer');
+  const clearLogsButton = document.getElementById('clearLogs');
 
   // Load blocked sites and API key when popup opens
   loadBlockedSites();
   loadApiKey();
+  loadLogs();
+
+  // Function to add a log entry
+  function addLogEntry(site, response, isBlocked) {
+    const logEntry = document.createElement('div');
+    logEntry.className = 'log-entry';
+    
+    const siteSpan = document.createElement('div');
+    siteSpan.className = 'log-site';
+    siteSpan.textContent = `Site: ${site}`;
+    
+    const responseSpan = document.createElement('div');
+    responseSpan.className = 'log-response';
+    responseSpan.textContent = `Gemini Response: ${response}`;
+    
+    const actionSpan = document.createElement('div');
+    actionSpan.className = 'log-response';
+    actionSpan.textContent = `Action: ${isBlocked ? 'Blocked' : 'Allowed'}`;
+    
+    logEntry.appendChild(siteSpan);
+    logEntry.appendChild(responseSpan);
+    logEntry.appendChild(actionSpan);
+    
+    // Add to beginning of log container
+    logContainer.insertBefore(logEntry, logContainer.firstChild);
+    
+    // Keep only last 10 entries
+    while (logContainer.children.length > 10) {
+      logContainer.removeChild(logContainer.lastChild);
+    }
+    
+    // Save logs to storage
+    saveLogs();
+  }
+
+  // Function to save logs to storage
+  function saveLogs() {
+    const logs = Array.from(logContainer.children).map(entry => ({
+      site: entry.querySelector('.log-site').textContent.replace('Site: ', ''),
+      response: entry.querySelector('.log-response').textContent.replace('Gemini Response: ', ''),
+      action: entry.querySelector('.log-response:last-child').textContent.replace('Action: ', '')
+    }));
+    chrome.storage.sync.set({ siteCheckLogs: logs });
+  }
+
+  // Function to load logs from storage
+  function loadLogs() {
+    chrome.storage.sync.get(['siteCheckLogs'], function(result) {
+      const logs = result.siteCheckLogs || [];
+      logs.forEach(log => {
+        addLogEntry(log.site, log.response, log.action === 'Blocked');
+      });
+    });
+  }
 
   // API Key Management
   saveApiKeyButton.addEventListener('click', function() {
@@ -40,16 +96,17 @@ document.addEventListener('DOMContentLoaded', function() {
     }
 
     try {
-      console.log('Testing API connection with key:', apiKey.substring(0, 5) + '...');
       const response = await testGeminiConnection(apiKey);
       if (response.success) {
         showApiStatus('Connected to Gemini API successfully', 'connected');
+        addLogEntry('Test Connection', 'Success', false);
       } else {
         showApiStatus('Failed to connect to Gemini API', 'error');
+        addLogEntry('Test Connection', 'Failed', false);
       }
     } catch (error) {
-      console.error('Detailed error:', error);
       showApiStatus('Error testing connection: ' + error.message, 'error');
+      addLogEntry('Test Connection', 'Error: ' + error.message, false);
     }
   });
 
@@ -131,45 +188,18 @@ document.addEventListener('DOMContentLoaded', function() {
           const isDistracting = await checkIfDistracting(hostname, result.apiKey);
           if (isDistracting) {
             addSite(hostname);
+            addLogEntry(hostname, 'Yes', true);
           } else {
             showFeedback('Site is not distracting');
+            addLogEntry(hostname, 'No', false);
           }
         } else {
           showFeedback('Cannot block this type of page');
+          addLogEntry(url.href, 'Not checked (Chrome internal page)', false);
         }
       }
     });
   });
-
-  // Check if site is distracting using Gemini
-  async function checkIfDistracting(site, apiKey) {
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          contents: [{
-            parts: [{
-              text: `Is ${site} a distracting website that should be blocked to maintain focus? Evaluate basis of following categories: Entertainment, Social Media, News, Shopping, Gambling, Gaming, Sports. Answer with only 'yes' or 'no'.`
-            }]
-          }]
-        })
-      });
-
-      if (!response.ok) {
-        throw new Error('API request failed');
-      }
-
-      const data = await response.json();
-      const answer = data.candidates[0].content.parts[0].text.toLowerCase().trim();
-      return answer === 'yes';
-    } catch (error) {
-      console.error('Error checking site:', error);
-      return false;
-    }
-  }
 
   // Also trigger add when Enter key is pressed
   siteInput.addEventListener('keypress', function(e) {
@@ -268,4 +298,42 @@ document.addEventListener('DOMContentLoaded', function() {
       });
     });
   }
+
+  // Check if site is distracting using Gemini
+  async function checkIfDistracting(site, apiKey) {
+    try {
+      const response = await fetch(`https://generativelanguage.googleapis.com/v1/models/gemini-2.0-flash:generateContent?key=${apiKey}`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          contents: [{
+            parts: [{
+              text: `Is ${site} a distracting website that should be blocked to maintain focus? Evaluate basis of following categories: Entertainment, Social Media, News, Shopping, Gambling, Gaming, Sports. Answer with only 'yes' or 'no'.`
+            }]
+          }]
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('API request failed');
+      }
+
+      const data = await response.json();
+      const answer = data.candidates[0].content.parts[0].text.toLowerCase().trim();
+      return answer === 'yes';
+    } catch (error) {
+      console.error('Error checking site:', error);
+      return false;
+    }
+  }
+
+  // Clear logs button functionality
+  clearLogsButton.addEventListener('click', function() {
+    logContainer.innerHTML = '';
+    chrome.storage.sync.set({ siteCheckLogs: [] }, function() {
+      showFeedback('Logs cleared successfully');
+    });
+  });
 });

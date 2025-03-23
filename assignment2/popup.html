@@ -86,6 +86,54 @@
     .edit-api-btn:hover {
       background-color: #f57c00;
     }
+    .log-section {
+      margin-top: 15px;
+      border: 1px solid #eee;
+      border-radius: 4px;
+      padding: 15px;
+    }
+    .log-title {
+      font-weight: bold;
+      margin-bottom: 10px;
+      color: #333;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .clear-logs-btn {
+      background-color: #ff4444;
+      color: white;
+      border: none;
+      border-radius: 4px;
+      padding: 4px 8px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+    .clear-logs-btn:hover {
+      background-color: #cc0000;
+    }
+    #logContainer {
+      max-height: 150px;
+      overflow-y: auto;
+      font-size: 12px;
+      font-family: monospace;
+    }
+    .log-entry {
+      margin-bottom: 8px;
+      padding: 5px;
+      border-bottom: 1px solid #eee;
+    }
+    .log-entry:last-child {
+      border-bottom: none;
+    }
+    .log-site {
+      color: #2196F3;
+      font-weight: bold;
+    }
+    .log-response {
+      color: #4CAF50;
+      margin-top: 3px;
+    }
   </style>
 </head>
 <body>
@@ -114,6 +162,14 @@
       <button id="addSite">Add Site</button>
     </div>
     <div id="blockedSites"></div>
+
+    <div class="log-section">
+      <div class="log-title">
+        Recent Site Checks
+        <button id="clearLogs" class="clear-logs-btn">Clear Logs</button>
+      </div>
+      <div id="logContainer"></div>
+    </div>
   </div>
   <script src="popup.js"></script>
 </body>

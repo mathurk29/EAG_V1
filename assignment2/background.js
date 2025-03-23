@@ -23,11 +23,35 @@ function isChromeInternalPage(url) {
   return chromeInternalProtocols.some(protocol => url.startsWith(protocol));
 }
 
+// Function to add a log entry
+function addLogEntry(site, response, isBlocked) {
+  chrome.storage.sync.get(['siteCheckLogs'], function(result) {
+    const logs = result.siteCheckLogs || [];
+    const newLog = {
+      site: site,
+      response: response,
+      action: isBlocked ? 'Blocked' : 'Allowed'
+    };
+    
+    // Add to beginning of array
+    logs.unshift(newLog);
+    
+    // Keep only last 10 entries
+    if (logs.length > 10) {
+      logs.pop();
+    }
+    
+    // Save back to storage
+    chrome.storage.sync.set({ siteCheckLogs: logs });
+  });
+}
+
 // Function to check with Gemini if a site is distracting
 async function checkWithGemini(site) {
   try {
     const result = await chrome.storage.sync.get(['apiKey']);
     if (!result.apiKey) {
+      addLogEntry(site, 'No API key configured', false);
       return false;
     }
 
@@ -39,21 +63,25 @@ async function checkWithGemini(site) {
       body: JSON.stringify({
         contents: [{
           parts: [{
-            text: `Is ${site} a distracting website that should be blocked to maintain focus? Answer with only 'yes' or 'no'.`
+            text: `Is ${site} a distracting website that should be blocked to maintain focus? Evaluate basis of following categories: Entertainment, Social Media, News, Shopping, Gambling, Gaming, Sports. Answer with only 'yes' or 'no'.`
           }]
         }]
       })
     });
 
     if (!response.ok) {
+      const errorText = await response.text();
+      addLogEntry(site, `Error: ${errorText}`, false);
       throw new Error('API request failed');
     }
 
     const data = await response.json();
     const answer = data.candidates[0].content.parts[0].text.toLowerCase().trim();
+    addLogEntry(site, answer, answer === 'yes');
     return answer === 'yes';
   } catch (error) {
     console.error('Error checking site with Gemini:', error);
+    addLogEntry(site, `Error: ${error.message}`, false);
     return false;
   }
 }
@@ -62,6 +90,7 @@ async function checkWithGemini(site) {
 async function shouldBlock(url) {
   // Don't block Chrome internal pages
   if (isChromeInternalPage(url)) {
+    addLogEntry(url, 'Not checked (Chrome internal page)', false);
     return false;
   }
 
@@ -70,6 +99,7 @@ async function shouldBlock(url) {
   // First check if it's in the blocked list
   const isInBlockedList = await isBlocked(url);
   if (isInBlockedList) {
+    addLogEntry(hostname, 'Yes (in blocked list)', true);
     return true;
   }
 
