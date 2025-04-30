@@ -1,0 +1,20 @@
+create a Chrome Agentic AI Plugin to Track the price of a Stock
+
+
+To do this - we will use Gemini 2.0 Flash but without it's agentic capabilities.
+
+
+Your task is :
+
+create a Python tool - that can track the price of stock.
+
+call The LLM - but strip down it's agentic capabilities using prompt engineering.
+
+to achieve this assignment you must:
+call your LLM multiple times:
+Query→LLM Response→Tool Call:Tool Result→Query→LLM Response→Tool Call:Tool Result→Query→LLM Response→Result
+Each time your Query stores "ALL" past interaction
+Query1→LLM Response→Tool Call:Tool Result→Query2→LLM Response→Tool Call:Tool Result→Query3→LLM Response→Result
+
+
+Remeber - you have to strip down the LLM from it's agentic capabilities and use them just as LLM and the LLM then has to tell how to call the tool. 
