@@ -4,37 +4,72 @@
   <title>Stock News Analyzer</title>
   <style>
     body {
-      width: 300px;
-      padding: 10px;
+      width: 400px;
+      padding: 15px;
       font-family: Arial, sans-serif;
     }
     .container {
       display: flex;
       flex-direction: column;
-      gap: 10px;
+      gap: 15px;
     }
     input {
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 4px;
+      font-size: 14px;
     }
     button {
-      padding: 8px;
+      padding: 10px;
       background-color: #4CAF50;
       color: white;
       border: none;
       border-radius: 4px;
       cursor: pointer;
+      font-size: 14px;
+      font-weight: bold;
     }
     button:hover {
       background-color: #45a049;
     }
     #result {
-      margin-top: 10px;
-      padding: 10px;
+      margin-top: 15px;
+      padding: 15px;
       border: 1px solid #ddd;
       border-radius: 4px;
       min-height: 100px;
+      max-height: 600px;
+      overflow-y: auto;
+    }
+    .graph-container {
+      margin: 15px 0;
+      padding: 10px;
+      background-color: #f9f9f9;
+      border-radius: 4px;
+    }
+    .news-container {
+      margin-top: 15px;
+    }
+    .news-item {
+      margin-bottom: 15px;
+      padding: 10px;
+      background-color: #f5f5f5;
+      border-radius: 4px;
+      border-left: 4px solid #4CAF50;
+    }
+    .news-item h5 {
+      margin: 0 0 5px 0;
+      color: #666;
+    }
+    .news-item p {
+      margin: 5px 0;
+      line-height: 1.4;
+    }
+    .error {
+      color: #d32f2f;
+      padding: 10px;
+      background-color: #ffebee;
+      border-radius: 4px;
     }
   </style>
 </head>
