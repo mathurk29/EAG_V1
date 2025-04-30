@@ -1,0 +1,13 @@
+{
+  "manifest_version": 3,
+  "name": "Stock News Analyzer",
+  "version": "1.0",
+  "description": "Analyzes stock prices based on news",
+  "permissions": ["activeTab"],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "host_permissions": [
+    "http://localhost:8000/*"
+  ]
+} 
