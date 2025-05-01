@@ -1,23 +1,19 @@
 # Stock News Analyzer Chrome Extension
 
-This Chrome Extension analyzes stock prices based on news articles and displays the correlation between news events and stock price movements.
+This Chrome Extension analyzes stock prices in relation to news events using LLM (Language Learning Model) integration.
 
-## Setup
+## Setup Instructions
 
-1. Install Python dependencies:
+1. Install the required Python packages:
 ```bash
 pip install -r requirements.txt
 ```
 
-2. Create a `.env` file in the root directory and add your API keys:
+2. Set up your environment variables:
+Create a `.env` file in the root directory with:
 ```
-ALPHA_VANTAGE_KEY=your_alpha_vantage_key_here
-FINNHUB_KEY=your_finnhub_key_here
+GOOGLE_API_KEY=your_google_api_key_here
 ```
-
-You can get your API keys from:
-- Alpha Vantage: https://www.alphavantage.co/support/#api-key
-- Finnhub: https://finnhub.io/register
 
 3. Start the FastAPI server:
 ```bash
@@ -27,36 +23,43 @@ python server.py
 4. Load the Chrome Extension:
    - Open Chrome and go to `chrome://extensions/`
    - Enable "Developer mode" in the top right
-   - Click "Load unpacked" and select the directory containing the extension files
+   - Click "Load unpacked" and select the `chrome_extension` directory
 
 ## Usage
 
-1. Click the extension icon in Chrome
+1. Click the extension icon in your Chrome toolbar
 2. Enter a stock symbol (e.g., AAPL, GOOGL, MSFT)
 3. Click "Analyze Stock"
-4. View the analysis results including:
-   - A graph showing stock price movements on news dates
-   - News articles with their corresponding stock prices
-   - Detailed summaries of each news event
+4. View the graph showing stock prices and related news events
 
 ## Features
 
-- Fetches real-time stock prices using Alpha Vantage API
-- Retrieves company news using Finnhub API
-- Generates an interactive graph showing price movements on news dates
-- Displays detailed news analysis with price correlations
-- Modern and responsive UI design
+- Fetches stock news and historical prices
+- Generates a graph showing price movements with news event markers
+- Displays news summaries with corresponding price changes
+- Uses LLM to analyze the relationship between news and price movements
+
+## Technical Details
+
+The extension consists of:
+- Chrome Extension (popup.html, popup.js, manifest.json)
+- FastAPI server (server.py)
+- LLM integration using Google's Gemini API
+
+The system follows an iterative approach to analyze stock data:
+1. Fetches news and price data
+2. Processes the data through the LLM
+3. Generates visualizations and insights
+4. Presents the results in an interactive interface
 
 ## Requirements
 
 - Python 3.7+
 - Chrome browser
-- Alpha Vantage API key
-- Finnhub API key
+- Google API key
 
 ## API Rate Limits
 
-- Alpha Vantage: 5 API calls per minute and 500 calls per day (free tier)
-- Finnhub: 60 API calls per minute (free tier)
+- Google: 100 API calls per minute (free tier)
 
 Please be mindful of these limits when using the extension. 

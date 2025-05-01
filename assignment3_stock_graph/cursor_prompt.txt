@@ -1,0 +1,85 @@
+I want to create a Chrome Extension that takes name of a stock - then connects to a FastAPI server that plots a graph of it's historical price based on the news.
+
+My goal is to use LLM without it's agentic abilities. I want to provide tools to it myself. Hence I have drafted a system prompt - 
+
+
+
+System Prompt:
+```
+You are a stock market agent who solves problem in iteration.
+
+Respond with EXACTLY ONE of these formats:
+
+1. FUNCTION_CALL: python_function_name|input
+
+
+You have the following tools at hand. You are supposed to complete the task only using the following tools. If these tools are not sufficient - advise what additional tools are required.
+
+where python_function_name is one of the following:
+1. get_stock_news(stock_name,from_date,to_date)
+2. get_stock_price(date)
+3. plot_graph
+
+
+Task: Find the news about a particular stock and link it with its price changes (e.g. search news about Ola in the last 1 month and news date, then see how the stock moved on those dates, and then link this data)
+
+DO NOT include multiple responses. Give ONE response at a time.
+```
+
+
+Here is a draft of code that I would like to use for LLM to call the tools:
+
+
+```
+while current_iteration < max_iterations:
+    print(f"\n--- Iteration {current_iteration + 1} ---")
+    if last_response == None:
+        current_query = query
+    else:
+        current_query = current_query + "\n\n" + " ".join(iteration_response)
+        current_query = current_query + "  What should I do next?"
+
+    # Get model's response
+    prompt = f"{system_prompt}\n\nQuery: {current_query}"
+    response = client.models.generate_content(model="gemini-2.0-flash", contents=prompt)
+
+    response_text = response.text.strip()
+    print(f"LLM Response: {response_text}")
+
+    if response_text.startswith("FUNCTION_CALL:"):
+        response_text = response.text.strip()
+        _, function_info = response_text.split(":", 1)
+        func_name, params = [x.strip() for x in function_info.split("|", 1)]
+        iteration_result = function_caller(func_name, ast.literal_eval(params))
+
+    # Check if it's the final answer
+    elif response_text.startswith("FINAL_ANSWER:"):
+        plot_graph()
+	print("\n=== Agent Execution Complete ===")
+        break
+
+    print(f"  Result: {iteration_result}")
+    last_response = iteration_result
+    iteration_response.append(
+        f"In the {current_iteration + 1} iteration you called {func_name} with {params} parameters, and the function returned {iteration_result}."
+    )
+
+    current_iteration += 1
+```
+
+
+
+def function_caller(func_name, params):
+    """Simple function caller that maps function names to actual functions"""
+    function_map = {
+        "generate_fibonacci": generate_fibonacci,
+        "get_log_base_10": get_log_base_10,
+        "sum_list": sum_list,
+        "apply_function": apply_function,
+        "slice_list": slice_list
+    }
+    
+    if func_name in function_map:
+        return function_map[func_name](params)
+    else:
+        return f"Function {func_name} not found"

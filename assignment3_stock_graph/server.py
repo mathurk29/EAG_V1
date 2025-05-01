@@ -12,6 +12,10 @@ import io
 import base64
 import os
 from dotenv import load_dotenv
+import yfinance as yf
+import google.generativeai as genai
+import ast
+from typing import List, Dict, Any
 
 load_dotenv()
 
@@ -36,126 +40,118 @@ if not alpha_vantage_key or not finnhub_key:
 ts = TimeSeries(key=alpha_vantage_key, output_format='pandas')
 finnhub_client = FinnhubClient(api_key=finnhub_key)
 
+# Configure Gemini API
+GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
+if not GOOGLE_API_KEY:
+    raise ValueError("Please set GOOGLE_API_KEY environment variable")
+
+genai.configure(api_key=GOOGLE_API_KEY)
+client = genai.GenerativeModel('gemini-pro')
+
+# System prompt for the LLM
+SYSTEM_PROMPT = """
+You are a stock market agent who solves problem in iteration.
+
+Respond with EXACTLY ONE of these formats:
+
+1. FUNCTION_CALL: python_function_name|input
+
+You have the following tools at hand. You are supposed to complete the task only using the following tools. If these tools are not sufficient - advise what additional tools are required.
+
+where python_function_name is one of the following:
+1. get_stock_news(stock_name,from_date,to_date)
+2. get_stock_price(date)
+3. plot_graph
+
+Task: Find the news about a particular stock and link it with its price changes (e.g. search news about Ola in the last 1 month and news date, then see how the stock moved on those dates, and then link this data)
+
+DO NOT include multiple responses. Give ONE response at a time.
+"""
+
 class StockRequest(BaseModel):
     stock_name: str
+    from_date: str
+    to_date: str
 
-@lru_cache()
-def get_stock_news(stock_name: str, from_date: str, to_date: str):
-    try:
-        # Convert dates to Unix timestamps
-        from_timestamp = int(datetime.strptime(from_date, '%Y-%m-%d').timestamp())
-        to_timestamp = int(datetime.strptime(to_date, '%Y-%m-%d').timestamp())
-        
-        # Get company news from Finnhub
-        news = finnhub_client.company_news(stock_name, _from=from_date, to=to_date)
-        
-        if not news:
-            return []
-            
-        # Process and format news articles
-        formatted_news = []
-        for article in news:
-            formatted_news.append({
-                'title': article.get('headline', ''),
-                'summary': article.get('summary', ''),
-                'url': article.get('url', ''),
-                'publishedAt': datetime.fromtimestamp(article.get('datetime', 0)).strftime('%Y-%m-%dT%H:%M:%SZ'),
-                'source': article.get('source', ''),
-                'category': article.get('category', '')
-            })
-        
-        return formatted_news
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Error fetching news: {str(e)}")
+class FunctionCall(BaseModel):
+    func_name: str
+    params: Dict[str, Any]
 
-def get_stock_price(stock_name: str, date: str):
-    try:
-        # Get daily data for the month containing the date
-        start_date = datetime.strptime(date, '%Y-%m-%d') - timedelta(days=5)
-        end_date = datetime.strptime(date, '%Y-%m-%d') + timedelta(days=5)
-        
-        data, meta_data = ts.get_daily(symbol=stock_name, outputsize='full')
-        
-        # Filter data for the specific date
-        target_date = pd.to_datetime(date)
-        if target_date in data.index:
-            return float(data.loc[target_date]['4. close'])
-        return None
-    except Exception as e:
-        logging.error(f"Error fetching stock price: {str(e)}")
-        raise HTTPException(status_code=500, detail=f"Error fetching stock price: {str(e)}")
+def get_stock_news(stock_name: str, from_date: str, to_date: str) -> List[Dict[str, Any]]:
+    """Get news for a stock using yfinance"""
+    stock = yf.Ticker(stock_name)
+    news = stock.news
+    filtered_news = [
+        {
+            "date": datetime.fromtimestamp(n["providerPublishTime"]).strftime("%Y-%m-%d"),
+            "title": n["title"],
+            "summary": n.get("summary", "No summary available")
+        }
+        for n in news
+        if from_date <= datetime.fromtimestamp(n["providerPublishTime"]).strftime("%Y-%m-%d") <= to_date
+    ]
+    return filtered_news
 
-def plot_graph(stock_name: str, news_dates: list, prices: list):
+def get_stock_price(stock_name: str, date: str) -> float:
+    """Get historical stock price for a specific date"""
+    stock = yf.Ticker(stock_name)
+    hist = stock.history(start=date, end=date)
+    if not hist.empty:
+        return float(hist['Close'].iloc[0])
+    return None
+
+def plot_graph(prices: List[float], dates: List[str], news: List[Dict[str, Any]]) -> str:
+    """Create a plot of stock prices with news markers"""
     plt.figure(figsize=(12, 6))
-    plt.plot(news_dates, prices, marker='o', linestyle='-', color='blue')
-    plt.title(f'{stock_name} Stock Price on News Dates')
-    plt.xlabel('Date')
-    plt.ylabel('Price ($)')
-    plt.xticks(rotation=45)
-    plt.grid(True, linestyle='--', alpha=0.7)
-    plt.tight_layout()
+    plt.plot(dates, prices, label='Stock Price', marker='o')
     
-    # Save plot to bytes
+    # Add news markers
+    for news_item in news:
+        date = news_item["date"]
+        if date in dates:
+            idx = dates.index(date)
+            price = prices[idx]
+            plt.scatter(date, price, color='red', s=100, alpha=0.5)
+            plt.annotate(news_item["title"][:30] + "...", 
+                        (date, price),
+                        xytext=(10, 10),
+                        textcoords='offset points')
+    
+    plt.title('Stock Price with News Events')
+    plt.xlabel('Date')
+    plt.ylabel('Price')
+    plt.legend()
+    plt.grid(True)
+    plt.xticks(rotation=45)
+    
+    # Convert plot to base64 string
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', dpi=300, bbox_inches='tight')
+    plt.savefig(buf, format='png', bbox_inches='tight')
     buf.seek(0)
     plt.close()
-    
-    # Convert to base64
-    img_str = base64.b64encode(buf.read()).decode()
-    return img_str
+    return base64.b64encode(buf.getvalue()).decode()
 
-@app.post("/analyze")
-async def analyze_stock(request: StockRequest):
+def function_caller(func_name: str, params: Dict[str, Any]) -> Any:
+    """Call the appropriate function based on the function name"""
+    function_map = {
+        "get_stock_news": get_stock_news,
+        "get_stock_price": get_stock_price,
+        "plot_graph": plot_graph
+    }
+    
+    if func_name in function_map:
+        return function_map[func_name](**params)
+    else:
+        raise ValueError(f"Function {func_name} not found")
+
+@app.post("/call_function")
+async def call_function(request: FunctionCall):
     try:
-        # Get dates for last month
-        end_date = datetime.now()
-        start_date = end_date - timedelta(days=3)
-        
-        # Get news
-        news = get_stock_news(
-            request.stock_name,
-            start_date.strftime('%Y-%m-%d'),
-            end_date.strftime('%Y-%m-%d')
-        )
-        
-        # Extract dates and get prices
-        news_dates = []
-        prices = []
-        news_summaries = []
-        
-        for article in news:
-            date = datetime.strptime(article['publishedAt'], '%Y-%m-%dT%H:%M:%SZ').strftime('%Y-%m-%d')
-            price = get_stock_price(request.stock_name, date)
-            if price is not None:
-                news_dates.append(date)
-                prices.append(price)
-                news_summaries.append({
-                    'date': date,
-                    'title': article['title'],
-                    'summary': article['summary']
-                })
-        
-        if not news_dates:
-            return {
-                "status": "error",
-                "message": "No valid news dates found for analysis"
-            }
-        
-        # Generate plot
-        plot_data = plot_graph(request.stock_name, news_dates, prices)
-        
+        result = function_caller(request.func_name, request.params)
         return {
             "status": "success",
-            "message": "Analysis complete",
-            "plot": plot_data,
-            "data": {
-                "dates": news_dates,
-                "prices": prices,
-                "news": news_summaries
-            }
+            "result": result
         }
-        
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
