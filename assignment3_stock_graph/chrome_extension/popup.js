@@ -18,10 +18,43 @@ Task: Find the news about a particular stock and link it with its price changes 
 DO NOT include multiple responses. Give ONE response at a time.
 `;
 
-// Initialize Gemini API
-const GOOGLE_API_KEY = 'YOUR_GOOGLE_API_KEY'; // Replace with your API key
-const client = new GoogleGenerativeAI(GOOGLE_API_KEY);
-const model = client.getGenerativeModel({ model: "gemini-pro" });
+let model = null;
+
+// Load saved API key on popup open
+document.addEventListener('DOMContentLoaded', async () => {
+  const result = await chrome.storage.local.get(['geminiApiKey']);
+  if (result.geminiApiKey) {
+    document.getElementById('apiKey').value = result.geminiApiKey;
+    initializeGemini(result.geminiApiKey);
+  }
+});
+
+// Save API key
+document.getElementById('saveKey').addEventListener('click', async () => {
+  const apiKey = document.getElementById('apiKey').value.trim();
+  if (!apiKey) {
+    showMessage('Please enter an API key', 'error');
+    return;
+  }
+
+  try {
+    await chrome.storage.local.set({ geminiApiKey: apiKey });
+    initializeGemini(apiKey);
+    showMessage('API key saved successfully!', 'success');
+  } catch (error) {
+    showMessage(`Error saving API key: ${error.message}`, 'error');
+  }
+});
+
+function initializeGemini(apiKey) {
+  const client = new GoogleGenerativeAI(apiKey);
+  model = client.getGenerativeModel({ model: "gemini-pro" });
+}
+
+function showMessage(message, type) {
+  const resultDiv = document.getElementById('result');
+  resultDiv.innerHTML = `<p class="${type}">${message}</p>`;
+}
 
 async function callFunction(funcName, params) {
   try {
@@ -68,8 +101,13 @@ document.getElementById('analyze').addEventListener('click', async () => {
   const stockName = document.getElementById('stockName').value;
   const resultDiv = document.getElementById('result');
   
+  if (!model) {
+    showMessage('Please save your API key first', 'error');
+    return;
+  }
+  
   if (!stockName) {
-    resultDiv.textContent = 'Please enter a stock symbol';
+    showMessage('Please enter a stock symbol', 'error');
     return;
   }
 
@@ -132,6 +170,6 @@ document.getElementById('analyze').addEventListener('click', async () => {
     }
 
   } catch (error) {
-    resultDiv.innerHTML = `<p class="error">Error: ${error.message}</p>`;
+    showMessage(`Error: ${error.message}`, 'error');
   }
 }); 

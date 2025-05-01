@@ -14,11 +14,23 @@
       flex-direction: column;
       gap: 15px;
     }
+    .input-group {
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .input-group label {
+      font-size: 12px;
+      color: #666;
+    }
     input {
       padding: 8px;
       border: 1px solid #ccc;
       border-radius: 4px;
       font-size: 14px;
+    }
+    input[type="password"] {
+      font-family: monospace;
     }
     button {
       padding: 10px;
@@ -72,12 +84,26 @@
       background-color: #ffebee;
       border-radius: 4px;
     }
+    .success {
+      color: #2e7d32;
+      padding: 10px;
+      background-color: #e8f5e9;
+      border-radius: 4px;
+    }
   </style>
 </head>
 <body>
   <div class="container">
     <h2>Stock News Analyzer</h2>
-    <input type="text" id="stockName" placeholder="Enter stock symbol (e.g., AAPL)">
+    <div class="input-group">
+      <label for="apiKey">Google Gemini API Key</label>
+      <input type="password" id="apiKey" placeholder="Enter your Google Gemini API key">
+    </div>
+    <div class="input-group">
+      <label for="stockName">Stock Symbol</label>
+      <input type="text" id="stockName" placeholder="Enter stock symbol (e.g., AAPL)">
+    </div>
+    <button id="saveKey">Save API Key</button>
     <button id="analyze">Analyze Stock</button>
     <div id="result"></div>
   </div>

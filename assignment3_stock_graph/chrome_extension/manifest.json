@@ -3,7 +3,10 @@
   "name": "Stock News Analyzer",
   "version": "1.0",
   "description": "Analyzes stock prices based on news",
-  "permissions": ["activeTab"],
+  "permissions": [
+    "activeTab",
+    "storage"
+  ],
   "action": {
     "default_popup": "popup.html"
   },
