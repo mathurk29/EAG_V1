@@ -13,8 +13,6 @@ import base64
 import os
 from dotenv import load_dotenv
 import yfinance as yf
-import google.generativeai as genai
-import ast
 from typing import List, Dict, Any
 
 load_dotenv()
@@ -40,34 +38,6 @@ if not alpha_vantage_key or not finnhub_key:
 ts = TimeSeries(key=alpha_vantage_key, output_format='pandas')
 finnhub_client = FinnhubClient(api_key=finnhub_key)
 
-# Configure Gemini API
-GOOGLE_API_KEY = os.getenv("GOOGLE_API_KEY")
-if not GOOGLE_API_KEY:
-    raise ValueError("Please set GOOGLE_API_KEY environment variable")
-
-genai.configure(api_key=GOOGLE_API_KEY)
-client = genai.GenerativeModel('gemini-pro')
-
-# System prompt for the LLM
-SYSTEM_PROMPT = """
-You are a stock market agent who solves problem in iteration.
-
-Respond with EXACTLY ONE of these formats:
-
-1. FUNCTION_CALL: python_function_name|input
-
-You have the following tools at hand. You are supposed to complete the task only using the following tools. If these tools are not sufficient - advise what additional tools are required.
-
-where python_function_name is one of the following:
-1. get_stock_news(stock_name,from_date,to_date)
-2. get_stock_price(date)
-3. plot_graph
-
-Task: Find the news about a particular stock and link it with its price changes (e.g. search news about Ola in the last 1 month and news date, then see how the stock moved on those dates, and then link this data)
-
-DO NOT include multiple responses. Give ONE response at a time.
-"""
-
 class StockRequest(BaseModel):
     stock_name: str
     from_date: str
@@ -77,28 +47,53 @@ class FunctionCall(BaseModel):
     func_name: str
     params: Dict[str, Any]
 
+@lru_cache(maxsize=1000)
 def get_stock_news(stock_name: str, from_date: str, to_date: str) -> List[Dict[str, Any]]:
-    """Get news for a stock using yfinance"""
-    stock = yf.Ticker(stock_name)
-    news = stock.news
-    filtered_news = [
-        {
-            "date": datetime.fromtimestamp(n["providerPublishTime"]).strftime("%Y-%m-%d"),
-            "title": n["title"],
-            "summary": n.get("summary", "No summary available")
-        }
-        for n in news
-        if from_date <= datetime.fromtimestamp(n["providerPublishTime"]).strftime("%Y-%m-%d") <= to_date
-    ]
-    return filtered_news
+    """Get news for a stock using Finnhub"""
+    try:
+        # Convert dates to timestamps
+        from_timestamp = int(datetime.strptime(from_date, "%Y-%m-%d").timestamp())
+        to_timestamp = int(datetime.strptime(to_date, "%Y-%m-%d").timestamp())
+        
+        # Get company news from Finnhub
+        news = finnhub_client.company_news(stock_name, _from=from_date, to=to_date)
+        
+        filtered_news = [
+            {
+                "date": datetime.fromtimestamp(n["datetime"]).strftime("%Y-%m-%d"),
+                "title": n["headline"],
+                "summary": n.get("summary", "No summary available")
+            }
+            for n in news
+            if from_timestamp <= n["datetime"] <= to_timestamp
+        ]
+        return filtered_news
+    except Exception as e:
+        logging.error(f"Error getting stock news from Finnhub: {str(e)}")
+        return []
 
 def get_stock_price(stock_name: str, date: str) -> float:
-    """Get historical stock price for a specific date"""
-    stock = yf.Ticker(stock_name)
-    hist = stock.history(start=date, end=date)
-    if not hist.empty:
-        return float(hist['Close'].iloc[0])
-    return None
+    """Get historical stock price for a specific date using Alpha Vantage"""
+    try:
+        # Get daily data from Alpha Vantage
+        data, meta_data = ts.get_daily(symbol=stock_name, outputsize='full')
+        
+        # Convert date string to datetime
+        target_date = pd.to_datetime(date)
+        
+        # Find the closest date in the data
+        if target_date in data.index:
+            return float(data.loc[target_date]['4. close'])
+        else:
+            # If exact date not found, get the closest previous date
+            available_dates = data.index[data.index <= target_date]
+            if len(available_dates) > 0:
+                closest_date = available_dates[-1]
+                return float(data.loc[closest_date]['4. close'])
+            return None
+    except Exception as e:
+        logging.error(f"Error getting stock price from Alpha Vantage: {str(e)}")
+        return None
 
 def plot_graph(prices: List[float], dates: List[str], news: List[Dict[str, Any]]) -> str:
     """Create a plot of stock prices with news markers"""
