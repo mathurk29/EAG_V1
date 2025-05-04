@@ -1,3 +1,7 @@
+
+# [DEMO](https://youtu.be/m4wwKMi6kPc)
+
+
 # Stock Analysis and Visualization System
 
 This system provides a comprehensive solution for stock analysis, visualization, and email notifications through a Chrome extension interface. It combines multiple data sources and APIs to deliver real-time stock information and insights.
