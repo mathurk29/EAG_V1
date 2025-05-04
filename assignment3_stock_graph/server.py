@@ -7,7 +7,8 @@ from alpha_vantage.timeseries import TimeSeries
 from finnhub import Client as FinnhubClient
 from datetime import datetime, timedelta
 import pandas as pd
-import matplotlib.pyplot as plt
+import plotly.graph_objects as go
+import plotly.io as pio
 import io
 import base64
 import os
@@ -270,40 +271,44 @@ def get_stock_price(stock_name: str, from_date: str, to_date: str) -> List[float
         logging.error(f"Error getting stock prices from Alpha Vantage: {str(e)}")
         return []
 
+from gmail_client import get_gmail_service
+
 def send_email(recipient_email: str, stock_name: str, body: str) -> bool:
     """Send email with stock plot attachment"""
     try:
+        service = get_gmail_service()
+        message = MIMEMultipart()
+        message['from'] = os.getenv('GMAIL_USER')
+        message['to'] = recipient_email
+        message['Subject'] = f"Stock Analysis Graph for {stock_name}"
+
+        # Email body
+        message.attach(MIMEText(body, 'plain'))
+
+        # Attach the plot
         stored_plot = plot_storage.get_plot(stock_name)
         if stored_plot is None:
             logging.info(f"No plot data found for stock {stock_name}, mail will be sent without plot attachment")
-
-        msg = MIMEMultipart()
-        msg['From'] = gmail_user
-        msg['To'] = recipient_email
-        msg['Subject'] = f"Stock Analysis Graph for {stock_name}"
-
-        # Email body
-        msg.attach(MIMEText(body, 'plain'))
-
+            
         # Attach the plot
         if stored_plot:
             image_data = base64.b64decode(stored_plot)
             image = MIMEImage(image_data)
             image.add_header('Content-Disposition', 'attachment', filename=f'{stock_name}_analysis.png')
-            msg.attach(image)
+            message.attach(image)
 
         # Send email
-        with smtplib.SMTP_SSL('smtp.gmail.com', 465) as smtp_server:
-            smtp_server.login(gmail_user, gmail_password)
-            smtp_server.sendmail(gmail_user, recipient_email, msg.as_string())
-        
+        raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+        message_body = {'raw': raw}
+        send_message = service.users().messages().send(userId="me", body=message_body).execute()
+        print(f'Email sent! Message Id: {send_message["id"]}')
         return True
     except Exception as e:
         logging.error(f"Error sending email: {str(e)}")
         return False
 
 def plot_graph(stock_name: str, from_date: str, to_date: str) -> Dict[str, Any]:
-    """Create a plot of stock prices with news markers"""
+    """Create a plot of stock prices with news markers using Plotly"""
     # Get prices and dates from storage or API
     prices = get_stock_price(stock_name, from_date, to_date)
     
@@ -314,41 +319,111 @@ def plot_graph(stock_name: str, from_date: str, to_date: str) -> Dict[str, Any]:
             "message": "No data available for the specified date range, advise you to call get_stock_price function first"
         }
     
+    # Convert index to datetime and sort
+    stored_data.index = pd.to_datetime(stored_data.index)
+    stored_data = stored_data.sort_index()
+    
     # Get the actual dates where we have price data
     dates = stored_data.index.strftime('%Y-%m-%d').tolist()
+    prices = stored_data['4. close'].tolist()
     
     # Get news from storage
     news = news_storage.get_news(stock_name, from_date, to_date)
     
-    plt.figure(figsize=(12, 6))
-    plt.plot(dates, prices, label='Stock Price', marker='o')
+    # Create the main price line
+    fig = go.Figure()
     
-    # Add news markers
-    for news_item in news:
+    # Add the main price line
+    fig.add_trace(go.Scatter(
+        x=dates,
+        y=prices,
+        mode='lines+markers',
+        name='Stock Price',
+        line=dict(color='#1f77b4', width=2),
+        marker=dict(size=6)
+    ))
+    
+    # Add news markers and annotations
+    for i, news_item in enumerate(news):
         date = news_item["date"]
         if date in dates:
             idx = dates.index(date)
             price = prices[idx]
-            plt.scatter(date, price, color='red', s=100, alpha=0.5)
-            plt.annotate(news_item["title"][:30] + "...", 
-                        (date, price),
-                        xytext=(10, 10),
-                        textcoords='offset points')
+            
+            # Add news marker
+            fig.add_trace(go.Scatter(
+                x=[date],
+                y=[price],
+                mode='markers',
+                name=news_item["title"][:30],
+                marker=dict(
+                    size=12,
+                    color='red',
+                    symbol='star',
+                    line=dict(width=2, color='DarkSlateGrey')
+                ),
+                showlegend=False
+            ))
+            
+            # Add news annotation
+            fig.add_annotation(
+                x=date,
+                y=price,
+                text=news_item["title"][:30] + "...",
+                showarrow=True,
+                arrowhead=2,
+                arrowsize=1,
+                arrowwidth=2,
+                arrowcolor="#636363",
+                ax=0,
+                ay=-40 if i % 2 == 0 else 40,
+                bgcolor="rgba(255, 255, 255, 0.8)",
+                bordercolor="rgba(0, 0, 0, 0.2)",
+                borderwidth=1,
+                borderpad=4,
+                font=dict(size=10)
+            )
     
-    plt.title('Stock Price with News Events')
-    plt.xlabel('Date')
-    plt.ylabel('Price')
-    plt.legend()
-    plt.grid(True)
-    plt.xticks(rotation=45)
+    # Update layout
+    fig.update_layout(
+        title=dict(
+            text=f'Stock Price with News Events - {stock_name}',
+            x=0.5,
+            y=0.95,
+            xanchor='center',
+            yanchor='top',
+            font=dict(size=20)
+        ),
+        xaxis=dict(
+            title='Date',
+            tickangle=45,
+            gridcolor='lightgrey',
+            showgrid=True
+        ),
+        yaxis=dict(
+            title='Price',
+            gridcolor='lightgrey',
+            showgrid=True
+        ),
+        plot_bgcolor='white',
+        hovermode='x unified',
+        hoverlabel=dict(
+            bgcolor="white",
+            font_size=12,
+            font_family="Rockwell"
+        ),
+        margin=dict(t=100, b=100)
+    )
+    
+    # Add range slider
+    fig.update_xaxes(rangeslider_visible=True)
     
     # Convert plot to base64 string
     buf = io.BytesIO()
-    plt.savefig(buf, format='png', bbox_inches='tight')
+    pio.write_image(fig, buf, format='png', width=1200, height=800, scale=2)
     buf.seek(0)
     plot_base64 = base64.b64encode(buf.getvalue()).decode()
-    plt.close()
-
+    
     response = {
         "message": "Plot saved successfully in memory."
     }
@@ -374,7 +449,7 @@ def function_caller(func_name: str, params: Dict[str, Any]) -> Any:
 
 @app.post("/call_function")
 async def call_function(request: FunctionCall):
-    try:
+    try:    
         result = function_caller(request.func_name, request.params)
         if result is None or result == "" or result == []:
             raise HTTPException(status_code=500, detail=f"No result from function {request.func_name}")

@@ -27,7 +27,7 @@ def get_gmail_service():
     return service
 
 def send_email(sender, to, subject, body_text):
-    sender = "coderswithpitchers@gmail.com"
+    sender = os.getenv('GMAIL_USER')
     service = get_gmail_service()
     message = MIMEText(body_text)
     message['to'] = to

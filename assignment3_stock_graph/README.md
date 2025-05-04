@@ -1,65 +1,157 @@
-# Stock News Analyzer Chrome Extension
+# Stock Analysis and Visualization System
 
-This Chrome Extension analyzes stock prices in relation to news events using LLM (Language Learning Model) integration.
+This system provides a comprehensive solution for stock analysis, visualization, and email notifications through a Chrome extension interface. It combines multiple data sources and APIs to deliver real-time stock information and insights.
 
-## Setup Instructions
+## System Architecture
 
-1. Install the required Python packages:
-```bash
-pip install -r requirements.txt
-```
+The system consists of three main components:
 
-2. Set up your environment variables:
-Create a `.env` file in the root directory with:
-```
-GOOGLE_API_KEY=your_google_api_key_here
-```
+1. **Backend Server (FastAPI)**
+   - Handles API requests from the Chrome extension
+   - Integrates with multiple data sources (Alpha Vantage, Finnhub)
+   - Manages data caching using Redis
+   - Provides email notification functionality
 
-3. Start the FastAPI server:
-```bash
-python server.py
-```
+2. **Chrome Extension**
+   - User interface for interacting with the system
+   - Real-time stock data visualization
+   - News aggregation and display
+   - Email notification interface
 
-4. Load the Chrome Extension:
-   - Open Chrome and go to `chrome://extensions/`
-   - Enable "Developer mode" in the top right
-   - Click "Load unpacked" and select the `chrome_extension` directory
-
-## Usage
-
-1. Click the extension icon in your Chrome toolbar
-2. Enter a stock symbol (e.g., AAPL, GOOGL, MSFT)
-3. Click "Analyze Stock"
-4. View the graph showing stock prices and related news events
+3. **Data Storage (Redis)**
+   - Caches stock prices, news, and plot data
+   - Optimizes API calls and improves response times
+   - Maintains historical data for quick retrieval
 
 ## Features
 
-- Fetches stock news and historical prices
-- Generates a graph showing price movements with news event markers
-- Displays news summaries with corresponding price changes
-- Uses LLM to analyze the relationship between news and price movements
+- **Stock Price Analysis**
+  - Historical price data retrieval
+  - Interactive price charts
+  - Technical analysis visualization
 
-## Technical Details
+- **News Integration**
+  - Company news aggregation
+  - Date-based news filtering
+  - News impact analysis
 
-The extension consists of:
-- Chrome Extension (popup.html, popup.js, manifest.json)
-- FastAPI server (server.py)
-- LLM integration using Google's Gemini API
+- **Email Notifications**
+  - Customizable email alerts
+  - Stock analysis reports
+  - Visual charts in emails
 
-The system follows an iterative approach to analyze stock data:
-1. Fetches news and price data
-2. Processes the data through the LLM
-3. Generates visualizations and insights
-4. Presents the results in an interactive interface
+## Setup Instructions
 
-## Requirements
+1. **Environment Setup**
+   ```bash
+   python -m venv .venv
+   source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+   pip install -r requirements.txt
+   ```
 
-- Python 3.7+
-- Chrome browser
-- Google API key
+2. **Environment Variables**
+   Create a `.env` file with the following variables:
+   ```
+   ALPHA_VANTAGE_KEY=your_alpha_vantage_key
+   FINNHUB_KEY=your_finnhub_key
+   GMAIL_USER=your_gmail_address
+   GMAIL_APP_PASSWORD=your_gmail_app_password
+   REDIS_URL=redis://127.0.0.1:6379
+   ```
 
-## API Rate Limits
+3. **Redis Setup**
+   - Install Redis on your system
+   - Start Redis server
+   - The system will automatically connect to Redis on startup
 
-- Google: 100 API calls per minute (free tier)
+4. **Chrome Extension Setup**
+   - Open Chrome and go to `chrome://extensions/`
+   - Enable "Developer mode"
+   - Click "Load unpacked" and select the `chrome_extension` directory
 
-Please be mindful of these limits when using the extension. 
+5. **Start the Server**
+   ```bash
+   python server.py
+   ```
+
+## API Endpoints
+
+The server provides the following endpoints:
+
+- `POST /call_function`: Main endpoint for all function calls
+  - Parameters:
+    - `func_name`: Name of the function to call
+    - `params`: Dictionary of parameters for the function
+
+## Available Functions
+
+1. `get_stock_news(stock_name, from_date, to_date)`
+   - Retrieves news for a specific stock within a date range
+   - Returns filtered news with date, title, and summary
+
+2. `get_stock_price(stock_name, from_date, to_date)`
+   - Fetches historical stock prices
+   - Returns list of closing prices
+
+3. `plot_graph(stock_name, from_date, to_date)`
+   - Generates interactive stock price charts
+   - Returns plot data in JSON format
+
+4. `send_email(recipient_email, stock_name, body)`
+   - Sends email notifications with stock analysis
+   - Includes visual charts and analysis
+
+## Data Storage
+
+The system uses Redis for efficient data caching:
+
+1. **NewsStorage**
+   - Stores news data by stock and date
+   - Optimizes news retrieval and filtering
+
+2. **StockPriceStorage**
+   - Caches historical price data
+   - Reduces API calls to Alpha Vantage
+
+3. **PlotStorage**
+   - Stores generated plot data
+   - Improves response times for repeated requests
+
+## Dependencies
+
+- FastAPI
+- Redis
+- Alpha Vantage API
+- Finnhub API
+- Plotly
+- Pandas
+- Python-dotenv
+- YFinance
+
+## Security Considerations
+
+- API keys are stored in environment variables
+- CORS is configured to only allow Chrome extension requests
+- Gmail authentication uses app-specific passwords
+- Redis connection is secured with proper error handling
+
+## Error Handling
+
+The system includes comprehensive error handling for:
+- API failures
+- Redis connection issues
+- Invalid data formats
+- Missing environment variables
+- Network connectivity problems
+
+## Contributing
+
+1. Fork the repository
+2. Create a feature branch
+3. Commit your changes
+4. Push to the branch
+5. Create a Pull Request
+
+## License
+
+This project is licensed under the MIT License - see the LICENSE file for details. 

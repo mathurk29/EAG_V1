@@ -12,10 +12,9 @@ Respond in EXACTLY ONE of these formats:
 You have the following tools at hand. You are supposed to complete the task only using the following tools.
 
 where python_function_name is one of the following:
-1. get_stock_news(stock_name,from_date,to_date):return True if news is fetched successfully and stored in-memory , else return False
+1. get_stock_news(stock_name,from_date,to_date):return news
 2. get_stock_price(stock_name,from_date,to_date): return list of prices for the given stock name and date range in chronological ascending order
 3. send_email(recipient_email,stock_name,body): return True if email is sent successfully, else return False
-4. plot_graph(stock_name,from_date,to_date): creates plot of the stock price for the given stock name and date range and stores it in-memory
 
 
 For example: if you are responding for getting stock news for stock named Ola for last 3 days, then you should return:
@@ -25,6 +24,10 @@ DO NOT include multiple responses. Give ONE response at a time.
 DO NOT GIVE EXPLANATION OR REASONING. JUST RETURN THE RESPONSE IN THE SPECIFIED FORMAT.
 DO NOT BREACH THE CONTRACT OF RESPONSE FORMAT!!!!!
 `;
+
+// Default query template for stock analysis
+const DEFAULT_QUERY = (stockName, fromDate, toDate) => 
+  `Find the news about ${stockName} and link it with its price changes from ${fromDate} to ${toDate} then see how the stock moved on those dates. Keep the analysis for a particular day within 50 words. Send the analysis to mathurk29@gmail.com`;
 
 let model = null;
 
@@ -201,14 +204,21 @@ document.getElementById('analyze').addEventListener('click', async () => {
     console.log('Date range:', { fromDate, toDate });
     
     let currentIteration = 0;
-    const maxIterations = 5;
+    const maxIterations = 10;
     const iterationHistory = [];
-    let query = `Find the news about ${stockName} and link it with its price changes from ${fromDate} to ${toDate} then see how the stock moved on those dates, and then link this data. Send the results to mathurk29@gmail.com`;
+    let query = DEFAULT_QUERY(stockName, fromDate, toDate);
     let responseText = null;
 
     while (currentIteration < maxIterations) {
       console.log(`Starting iteration ${currentIteration + 1}`);
       
+      // Check if we've reached maximum iterations
+      if (currentIteration >= maxIterations - 1) {
+        console.log('Maximum iterations reached');
+        showMessage("Maximum iterations reached without completion", 'error');
+        break;
+      }
+
       // Prepare the query with history
       let currentQuery = query;
       if (iterationHistory.length > 0) {
@@ -241,6 +251,26 @@ document.getElementById('analyze').addEventListener('click', async () => {
           serverResponse: serverResponse
         });
         console.log('Updated iteration history:', iterationHistory);
+
+        // Break if we received a TASK_COMPLETE response
+        if (responseText.startsWith("TASK_COMPLETE:")) {
+          console.log('Received TASK_COMPLETE, ending analysis');
+          let htmlContent = `
+            <h3>Analysis Results for ${stockName}</h3>
+            <div class="news-container">
+              <h4>Analysis Steps</h4>
+              ${iterationHistory.map((history, index) => `
+                <div class="iteration-step">
+                  <h5>Iteration ${index + 1}</h5>
+                  <p><strong>R${index + 1}:</strong> ${history.llmResponse}</p>
+                  <p><strong>S${index + 1}:</strong> ${JSON.stringify(history.serverResponse)}</p>
+                </div>
+              `).join('')}
+            </div>
+          `;
+          resultDiv.innerHTML = htmlContent;
+          break;
+        }
 
         // If we got a plot, we're done
         if (typeof serverResponse === 'string' && serverResponse.startsWith('data:image')) {
@@ -278,11 +308,6 @@ document.getElementById('analyze').addEventListener('click', async () => {
 
       currentIteration++;
       console.log(`Completed iteration ${currentIteration}`);
-    }
-
-    if (currentIteration >= maxIterations) {
-      console.log('Maximum iterations reached');
-      throw new Error("Maximum iterations reached without completion");
     }
 
   } catch (error) {
