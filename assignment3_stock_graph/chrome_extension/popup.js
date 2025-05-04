@@ -12,13 +12,14 @@ Respond in EXACTLY ONE of these formats:
 You have the following tools at hand. You are supposed to complete the task only using the following tools.
 
 where python_function_name is one of the following:
-1. get_stock_news(stock_name,from_date,to_date)
-2. get_stock_price(stock_name,date)
-3. plot_graph
+1. get_stock_news(stock_name,from_date,to_date):return True if news is fetched successfully and stored in-memory , else return False
+2. get_stock_price(stock_name,from_date,to_date): return list of prices for the given stock name and date range in chronological ascending order
+3. send_email(recipient_email,stock_name,body): return True if email is sent successfully, else return False
+4. plot_graph(stock_name,from_date,to_date): creates plot of the stock price for the given stock name and date range and stores it in-memory
 
 
 For example: if you are responding for getting stock news for stock named Ola for last 3 days, then you should return:
-get_stock_news|{"stock_name":"OLA","from_date":"2024-04-28","to_date":"2024-05-01"}
+FUNCTION_CALL: get_stock_news|{"stock_name":"OLA","from_date":"2024-04-28","to_date":"2024-05-01"}
 
 DO NOT include multiple responses. Give ONE response at a time.
 DO NOT GIVE EXPLANATION OR REASONING. JUST RETURN THE RESPONSE IN THE SPECIFIED FORMAT.
@@ -162,7 +163,7 @@ async function processLLMResponse(responseText, stockName, fromDate, toDate) {
     return taskCompleteMessage;
   }
   else if (responseText.startsWith("INSUFFICIENT_TOOLS:")) {
-    console.log('Response is a insufficient tools message');
+    console.log('Response is an insufficient tools message');
     const insufficientToolsMessage = responseText.split("INSUFFICIENT_TOOLS:")[1].trim();
     console.log('Insufficient tools message:', insufficientToolsMessage);
     return insufficientToolsMessage;
@@ -195,24 +196,29 @@ document.getElementById('analyze').addEventListener('click', async () => {
   console.log('Starting analysis');
 
   try {
-    const fromDate = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    const fromDate = new Date(Date.now() - 5 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
     const toDate = new Date().toISOString().split('T')[0];
     console.log('Date range:', { fromDate, toDate });
     
     let currentIteration = 0;
     const maxIterations = 5;
-    let lastResponse = null;
-    const iterationResponses = [];
-    let query = `Analyze stock price of ${stockName} from ${fromDate} to ${toDate} and plot the graph`;
+    const iterationHistory = [];
+    let query = `Find the news about ${stockName} and link it with its price changes from ${fromDate} to ${toDate} then see how the stock moved on those dates, and then link this data. Send the results to mathurk29@gmail.com`;
+    let responseText = null;
 
     while (currentIteration < maxIterations) {
       console.log(`Starting iteration ${currentIteration + 1}`);
-      // Prepare the query
-      let currentQuery;
-      if (lastResponse === null) {
-        currentQuery = query;
-      } else {
-        currentQuery = query + `\nIn the previous iteration you responded with ${JSON.stringify(lastResponse)}. What should I do next?`;
+      
+      // Prepare the query with history
+      let currentQuery = query;
+      if (iterationHistory.length > 0) {
+        currentQuery += '\n\nPrevious iterations:';
+        iterationHistory.forEach((history, index) => {
+          currentQuery += `\n\nIteration ${index + 1}:`;
+          currentQuery += `\nR${index + 1}: ${history.llmResponse}`;
+          currentQuery += `\nS${index + 1}: ${JSON.stringify(history.serverResponse)}`;
+        });
+        currentQuery += '\n\nWhat should I do next?';
       }
       console.log('Current query:', currentQuery);
 
@@ -220,31 +226,45 @@ document.getElementById('analyze').addEventListener('click', async () => {
       const prompt = `${SYSTEM_PROMPT}\n\nQuery: ${currentQuery}`;
       console.log('Sending prompt to model');
       const result = await model.generateContent(prompt);
-      const responseText = result.response.text().trim();
+      responseText = result.response.text().trim();
       console.log('Model response:', responseText);
       
       // Process the response
       try {
         console.log('Processing model response');
-        const result = await processLLMResponse(responseText, stockName, fromDate, toDate);
-        console.log('Processed result:', result);
+        const serverResponse = await processLLMResponse(responseText, stockName, fromDate, toDate);
+        console.log('Processed result:', serverResponse);
         
-        lastResponse = result;
-        iterationResponses.push(`Iteration ${currentIteration + 1}: ${responseText}`);
-        console.log('Updated iteration responses:', iterationResponses);
+        // Store both LLM and server responses in history
+        iterationHistory.push({
+          llmResponse: responseText,
+          serverResponse: serverResponse
+        });
+        console.log('Updated iteration history:', iterationHistory);
 
         // If we got a plot, we're done
-        if (typeof result === 'string' && result.startsWith('data:image')) {
+        if (typeof serverResponse === 'string' && serverResponse.startsWith('data:image')) {
           console.log('Received plot image, completing analysis');
           // Create HTML content
           let htmlContent = `
             <h3>Analysis Results for ${stockName}</h3>
             <div class="graph-container">
-              <img src="data:image/png;base64,${result}" alt="Stock Price Graph" style="width: 100%;">
+              <img src="data:image/png;base64,${serverResponse}" alt="Stock Price Graph" style="width: 100%;">
             </div>
             <div class="news-container">
               <h4>Analysis Steps</h4>
-              ${iterationResponses.map(r => `<p>${r}</p>`).join('')}
+              ${iterationHistory.map((history, index) => `
+                <div class="iteration-step">
+                  <h5>Iteration ${index + 1}</h5>
+                  <p><strong>R${index + 1}:</strong> ${history.llmResponse}</p>
+                  <p><strong>S${index + 1}:</strong> ${JSON.stringify(history.serverResponse)}</p>
+                </div>
+              `).join('')}
+              <div class="iteration-step">
+                <h5>Final Step</h5>
+                <p><strong>R${iterationHistory.length + 1}:</strong> ${responseText}</p>
+                <p><strong>S${iterationHistory.length + 1}:</strong> Plot successfully generated</p>
+              </div>
             </div>
           `;
           resultDiv.innerHTML = htmlContent;
