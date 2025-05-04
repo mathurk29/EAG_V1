@@ -1,5 +1,11 @@
 Advise: Disable word wrap
 
+
+Please find dev console logs here: https://github.com/mathurk29/EAG_V1/blob/main/assignment3_stock_graph/console.log
+
+
+Extension Output:
+
 Analysis Results for MSFT
 Analysis Steps
 Iteration 1
