@@ -84,32 +84,67 @@ The system consists of three main components:
 
 1. **Environment Setup**
    ```bash
-   python -m venv .venv
+   uv venv
    source .venv/bin/activate  # On Windows: .venv\Scripts\activate
-   pip install -r requirements.txt
+   uv add -r requirements.txt
    ```
 
-2. **Environment Variables**
+2. **Environment Setup**
    Create a `.env` file with the following variables:
    ```
    ALPHA_VANTAGE_KEY=your_alpha_vantage_key
    FINNHUB_KEY=your_finnhub_key
    GMAIL_USER=your_gmail_address
-   GMAIL_APP_PASSWORD=your_gmail_app_password
    REDIS_URL=redis://127.0.0.1:6379
    ```
+3. To send emails via Gmail API using Python and OAuth 2.0, follow these steps: 
 
-3. **Redis Setup**
+   a. Go to: https://console.cloud.google.com/
+
+   b. Create a new project (or use existing one).
+
+   c. Enable Gmail API from “APIs & Services > Library”.
+
+   d. Go to “Credentials” → Click “Create Credentials” → Choose OAuth client ID
+
+   e. Application Type: Desktop App
+
+   f. Download the client_secret.json file.
+
+   To bypass “App not verified” screen
+
+   a. Go to OAuth Consent Screen
+
+   b. Choose “External” user type
+
+   c. Fill in required details (App name, email, etc.)
+
+   d. Add https://www.googleapis.com/auth/gmail.send in Scopes
+
+   e. Add your Gmail address in Test Users
+
+   Now when your project executes the OAuth connection - and Google gives “App not verified” screen:
+
+   a. Click "Advanced"
+   
+   b. "Go to your_project_name (unsafe)"
+
+   c. continue login and grant permission.
+
+
+
+
+4. **Redis Setup**
    - Install Redis on your system
    - Start Redis server
    - The system will automatically connect to Redis on startup
 
-4. **Chrome Extension Setup**
+5. **Chrome Extension Setup**
    - Open Chrome and go to `chrome://extensions/`
    - Enable "Developer mode"
    - Click "Load unpacked" and select the `chrome_extension` directory
 
-5. **Start the Server**
+6. **Start the Server**
    ```bash
    python server.py
    ```
