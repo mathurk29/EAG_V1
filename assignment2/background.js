@@ -76,6 +76,16 @@ async function checkWithGemini(site) {
     const cachedResponse = await getCachedGeminiResponse(site);
     if (cachedResponse) {
       addLogEntry(site, cachedResponse.isDistracting ? 'Yes (cached)' : 'No (cached)', cachedResponse.isDistracting);
+      // If site is distracting, ensure it's in blocked list
+      if (cachedResponse.isDistracting) {
+        chrome.storage.sync.get(['blockedSites'], function(result) {
+          const blockedSites = result.blockedSites || [];
+          if (!blockedSites.includes(site)) {
+            blockedSites.push(site);
+            chrome.storage.sync.set({ blockedSites: blockedSites });
+          }
+        });
+      }
       return cachedResponse.isDistracting;
     }
 
@@ -111,6 +121,17 @@ async function checkWithGemini(site) {
     
     // Cache the response
     cacheGeminiResponse(site, isDistracting);
+    
+    // If site is distracting, add it to blocked list
+    if (isDistracting) {
+      chrome.storage.sync.get(['blockedSites'], function(result) {
+        const blockedSites = result.blockedSites || [];
+        if (!blockedSites.includes(site)) {
+          blockedSites.push(site);
+          chrome.storage.sync.set({ blockedSites: blockedSites });
+        }
+      });
+    }
     
     addLogEntry(site, answer, isDistracting);
     return isDistracting;

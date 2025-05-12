@@ -134,6 +134,23 @@
       color: #4CAF50;
       margin-top: 3px;
     }
+    .button-group {
+      display: flex;
+      gap: 10px;
+      margin-bottom: 10px;
+    }
+    .unblock-btn {
+      background-color: #ff9800;
+    }
+    .unblock-btn:hover {
+      background-color: #f57c00;
+    }
+    .unblock-section {
+      margin: 10px 0;
+    }
+    .unblock-section input {
+      margin-bottom: 5px;
+    }
   </style>
 </head>
 <body>
@@ -155,12 +172,21 @@
 
     <div class="divider"></div>
     
-    <button id="blockCurrentSite" class="current-site-btn">Block Current Site</button>
+    <div class="button-group">
+      <button id="blockCurrentSite" class="current-site-btn">Block Current Site</button>
+      <button id="unblockCurrentSite" class="current-site-btn unblock-btn">Unblock Current Site</button>
+    </div>
     
     <div>
       <input type="text" id="siteInput" placeholder="Enter website URL (e.g., facebook.com)">
       <button id="addSite">Add Site</button>
     </div>
+
+    <div class="unblock-section">
+      <input type="text" id="unblockSiteInput" placeholder="Enter site to unblock (e.g., facebook.com)">
+      <button id="unblockSite" class="unblock-btn">Unblock Site</button>
+    </div>
+
     <div id="blockedSites"></div>
 
     <div class="log-section">

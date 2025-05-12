@@ -2,6 +2,9 @@ document.addEventListener('DOMContentLoaded', function() {
   const siteInput = document.getElementById('siteInput');
   const addButton = document.getElementById('addSite');
   const blockCurrentButton = document.getElementById('blockCurrentSite');
+  const unblockCurrentButton = document.getElementById('unblockCurrentSite');
+  const unblockSiteInput = document.getElementById('unblockSiteInput');
+  const unblockSiteButton = document.getElementById('unblockSite');
   const blockedSitesDiv = document.getElementById('blockedSites');
   const apiKeyInput = document.getElementById('apiKeyInput');
   const saveApiKeyButton = document.getElementById('saveApiKey');
@@ -190,6 +193,71 @@ document.addEventListener('DOMContentLoaded', function() {
     });
   });
 
+  // Unblock current site button
+  unblockCurrentButton.addEventListener('click', async function() {
+    chrome.tabs.query({ active: true, currentWindow: true }, async function(tabs) {
+      if (tabs[0]) {
+        const url = new URL(tabs[0].url);
+        if (url.protocol.startsWith('http')) {
+          const hostname = url.hostname.replace(/^www\./, '');
+          removeSite(hostname);
+          addLogEntry(hostname, 'Manually unblocked by user', false, 'Manual Unblock');
+        } else {
+          showFeedback('Cannot unblock this type of page');
+          addLogEntry(url.href, 'Not checked (Chrome internal page)', false, 'System');
+        }
+      }
+    });
+  });
+
+  // Unblock site button
+  unblockSiteButton.addEventListener('click', function() {
+    unblockSite();
+  });
+
+  // Also trigger unblock when Enter key is pressed in unblock input
+  unblockSiteInput.addEventListener('keypress', function(e) {
+    if (e.key === 'Enter') {
+      unblockSite();
+    }
+  });
+
+  function unblockSite() {
+    let site = unblockSiteInput.value.trim().toLowerCase();
+    
+    // Clean up the input URL
+    site = site.replace(/^https?:\/\//, ''); // Remove http:// or https://
+    site = site.replace(/^www\./, ''); // Remove www.
+    site = site.split('/')[0]; // Remove any paths
+    
+    if (site) {
+      chrome.storage.sync.get(['blockedSites'], function(result) {
+        const blockedSites = result.blockedSites || [];
+        console.log('=== Unblock Site Debug Info ===');
+        console.log('Site to unblock:', site);
+        console.log('Current blocked sites:', blockedSites);
+        console.log('Exact match check:', blockedSites.includes(site));
+        
+        // Try a more flexible matching
+        const matchingSite = blockedSites.find(blockedSite => {
+          const matches = site.includes(blockedSite) || blockedSite.includes(site);
+          console.log(`Comparing "${site}" with "${blockedSite}": ${matches}`);
+          return matches;
+        });
+        
+        console.log('Matching site found:', matchingSite);
+        
+        if (matchingSite) {
+          removeSite(matchingSite);
+          addLogEntry(matchingSite, 'Manually unblocked by user', false, 'Manual Unblock');
+          unblockSiteInput.value = '';
+        } else {
+          showFeedback(`${site} is not in the blocked list`);
+        }
+      });
+    }
+  }
+
   // Also trigger add when Enter key is pressed
   siteInput.addEventListener('keypress', function(e) {
     if (e.key === 'Enter') {
@@ -251,7 +319,7 @@ document.addEventListener('DOMContentLoaded', function() {
   function loadBlockedSites() {
     chrome.storage.sync.get(['blockedSites'], function(result) {
       const blockedSites = result.blockedSites || [];
-      console.log('Current blocked sites:', blockedSites);
+      console.log('Loading blocked sites. Current list:', blockedSites);
       blockedSitesDiv.innerHTML = '';
       
       blockedSites.forEach(site => {
@@ -277,11 +345,23 @@ document.addEventListener('DOMContentLoaded', function() {
 
   // Remove a site from blocked list
   function removeSite(siteToRemove) {
-    chrome.storage.sync.get(['blockedSites'], function(result) {
+    chrome.storage.sync.get(['blockedSites', 'geminiResponses'], function(result) {
       const blockedSites = result.blockedSites || [];
+      const geminiResponses = result.geminiResponses || {};
+      
+      // Remove from blocked sites
       const updatedSites = blockedSites.filter(site => site !== siteToRemove);
-      chrome.storage.sync.set({ blockedSites: updatedSites }, function() {
+      
+      // Remove from Gemini cache
+      delete geminiResponses[siteToRemove];
+      
+      // Save both updates
+      chrome.storage.sync.set({
+        blockedSites: updatedSites,
+        geminiResponses: geminiResponses
+      }, function() {
         console.log('Site removed:', siteToRemove);
+        console.log('Gemini cache cleared for:', siteToRemove);
         loadBlockedSites();
         showFeedback(`Removed ${siteToRemove} from blocked list`);
       });
